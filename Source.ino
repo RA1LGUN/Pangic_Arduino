@@ -1,64 +1,76 @@
 #include <IRremote.h>
-//#include <Servo.h>
-//Servo myservo;  // 创建一个舵机控制对象
+#include <Servo.h>
+#define SensorINPUT 2
 
-int IR_PIN = 11;
-int pos = 0;
 int Sum = 0;
-int pulsewidth;
+int IR_PIN = 11;
+int state = 0;
+int state_time = 0;
+int sum_time = 0;
+
 
 IRrecv irDetect(IR_PIN);
-
 decode_results irIn;
 
-void setup()
-{
+Servo myservo;
+
+void setup() {
   Serial.begin(9600);
-  //myservo.attach(9);  // 该舵机由 arduino 第九脚控制
   irDetect.enableIRIn(); // Start the Receiver
+  attachInterrupt(0, shock, FALLING);
 }
 
 void loop() {
+  if (state != 0)
+  {
+    state = 0;
+    if (state_time > 2) {
+      Open();
+      state_time = 0;
+      delay(500);
+    } else {
+      state_time = state_time + 1;
+      delay(500);
+    }
+  }
+  if (state_time != 0) {
+    sum_time = sum_time + 1;
+    if (sum_time > 10000) {
+      state_time = 0;
+    }
+  }
   if (irDetect.decode(&irIn)) {
     decodeIR();
     if (Sum > 2) {
-      for (int i = 0; i <= 50; i++ ) {
-        servopulse(9, 60);
-      }
-      
-      delay(4000);
-      for (int i = 0; i <= 50; i++ ) {
-        servopulse(9, 120);
-      }
-      Serial.println("enter the loop");
-      delay(4000);
-      Sum = 0;
+      Open();
     }
-    Serial.println(Sum);
     delay(15);
-    Serial.println("================================\n");
+    //    Serial.println(Sum);
     irDetect.resume();
   }
+
+}
+
+void Open() {
+  myservo.attach(9);  // 该舵机由 arduino 第九脚控制
+  myservo.write(60);
+  delay(8000);
+  myservo.detach();
+  delay(8000);
+  myservo.attach(9);  // 该舵机由 arduino 第九脚控制
+  myservo.write(120);
+  delay(10500);
+  //      Serial.println("after");
+  myservo.detach();
+  //      Serial.println("late");
+  Sum = 0;
 }
 
 
-void servopulse(int servopin, int myangle) //定义一个脉冲函数
-{
-
-  pulsewidth = (myangle * 11) + 500; //将角度转化为500-2480 的脉宽值
-
-  digitalWrite(servopin, HIGH); //将舵机接口电平至高
-
-  delayMicroseconds(pulsewidth);//延时脉宽值的微秒数
-
-  digitalWrite(servopin, LOW); //将舵机接口电平至低
-
-  delay(20 - pulsewidth / 1000);
-
-  //Serial.println("enter the function");
-
-
+void shock() {//触发中端
+  state++;
 }
+
 
 void decodeIR() // Indicate what key is pressed
 
@@ -105,12 +117,7 @@ void decodeIR() // Indicate what key is pressed
 
     case 0xFFB04F:
       Serial.println("3");
-      if (Sum > 1) {
-        Sum = 3;
-      }
-      else {
-        Sum = 0;
-      }
+      Sum = 0;
       break;
 
     case 0xFF30CF:
@@ -120,8 +127,8 @@ void decodeIR() // Indicate what key is pressed
 
     case 0xFF18E7:
       Serial.println("5");
-      if (Sum > 0) {
-        Sum = 2;
+      if (Sum > -1) {
+        Sum = 1;
       }
       else {
         Sum = 0;
@@ -135,17 +142,17 @@ void decodeIR() // Indicate what key is pressed
 
     case 0xFF10EF:
       Serial.println("7");
-      if (Sum > -1) {
-        Sum = 1;
-      }
-      else {
-        Sum = 0;
-      }
+      Sum = 0;
       break;
 
     case 0xFF38C7:
       Serial.println("8");
-      Sum = 0;
+      if (Sum > 1) {
+        Sum = 3;
+      }
+      else {
+        Sum = 0;
+      }
       break;
 
     case 0xFF5AA5:
@@ -160,7 +167,12 @@ void decodeIR() // Indicate what key is pressed
 
     case 0xFF4AB5:
       Serial.println("0");
-      Sum = 0;
+      if (Sum > 0) {
+        Sum = 2;
+      }
+      else {
+        Sum = 0;
+      }
       break;
 
     case 0xFF52AD:
